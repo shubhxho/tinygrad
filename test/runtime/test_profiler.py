@@ -120,8 +120,8 @@ class TestProfiler(unittest.TestCase):
     buf2 = Buffer(f"{Device.DEFAULT}:1", 2, dtypes.float, options=BufferSpec(nolru=True)).ensure_allocated()
 
     with helper_collect_profile(TestProfiler.d0, d1) as profile:
-      buf1.copy_from(Buffer("PYTHON", 2, dtypes.float, opaque=memoryview(bytearray(struct.pack("ff", 0, 1)))))
-      buf2.copy_from(Buffer("PYTHON", 2, dtypes.float, opaque=memoryview(bytearray(struct.pack("ff", 0, 1)))))
+      buf1.copy_from(Buffer("PYTHON", 2, dtypes.float, initial_value=bytes(struct.pack("ff", 0, 1))))
+      buf2.copy_from(Buffer("PYTHON", 2, dtypes.float, initial_value=bytes(struct.pack("ff", 0, 1))))
 
     profile = filter_ranges(profile)
     for dev in [TestProfiler.d0.device, d1.device]:

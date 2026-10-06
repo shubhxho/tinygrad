@@ -229,7 +229,8 @@ class Buffer:
       self.allocator.dev.synchronize()
       if allow_zero_copy: return mv
       with cpu_profile(f"{self.device} -> TINY", f"{self.device}:COPY"): return memoryview(bytearray(mv))
-    return Buffer("PYTHON", self.size, self.dtype, preallocate=True).copy_from(self).as_memoryview()
+    Buffer("NPY", self.size, self.dtype, opaque=(mv:=memoryview(bytearray(self.nbytes)))).copy_from(self)
+    return mv
 
   def numpy(self) -> 'np.ndarray': # type: ignore [name-defined] # noqa: F821
     import numpy as np
