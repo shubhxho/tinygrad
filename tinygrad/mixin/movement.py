@@ -158,7 +158,11 @@ class MovementMixin:
     print(t.expand(4, -1).numpy())
     ```
     """
-    new_shape = tuple(from_ if to == -1 or to is None else to for from_, to in zip(*(_align_left(self.shape, argfix(shape, *args)))))
+    shape = argfix(shape, *args)
+    if len(shape) < self.ndim: raise ValueError("cannot expand to fewer dimensions")
+    if any(s == -1 or s is None for s in shape[:len(shape)-self.ndim]):
+      raise ValueError("cannot infer a new leading dimension in expand")
+    new_shape = tuple(from_ if to == -1 or to is None else to for from_, to in zip(*_align_left(self.shape, shape)))
     return self._broadcast_to(new_shape)
 
   def reshape(self, shape, *args) -> Self:
