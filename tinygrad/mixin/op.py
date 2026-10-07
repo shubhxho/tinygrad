@@ -1056,6 +1056,7 @@ class OpMixin(ElementwiseMixin, ReduceMixin):
     ```
     """
     assert isinstance(size, (tuple,list)) and all_int(size) and 0 < len(size) <= self.ndim, f"invalid {size=}"
+    assert all(s > 0 for s in size) and all(s > 0 for s in self.shape[-len(size):]), "interpolate spatial sizes must be positive"
     assert mode in ("linear", "nearest", "nearest-exact"), "only supports linear, nearest or nearest-exact interpolate"
     assert not (align_corners and mode != "linear"), "align_corners option can only be set with the interpolating mode linear"
     x, expand = self, list(self.shape)
