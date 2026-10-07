@@ -492,7 +492,9 @@ class MovementMixin:
     ```
     """
     if indexing not in ("ij", "xy"): raise RuntimeError(f'indexing must be in ("ij", "xy"), got {indexing}')
-    if len(tensors:=(self, *args)) == 1: return tensors
+    tensors = (self, *args)
+    if any(t.ndim > 1 for t in tensors): raise RuntimeError("meshgrid inputs must be scalars or 1D tensors")
+    if len(tensors) == 1: return (self.reshape(-1),)
     basis = tuple(range(len(tensors))) if indexing == "ij" else (1, 0) + tuple(range(2, len(tensors)))
     tensors = tuple(t.reshape((-1,) + (1,)*(len(args) - i)) for i,t in zip(basis, tensors))
     output_shape = _broadcast_shape(*(t.shape for t in tensors))
