@@ -23,12 +23,13 @@ actions += [Opt(op=OptOps.SWAP, axis=axis_0, arg=axis_1) for axis_0 in range(5) 
 
 def get_test_global_size(global_size, max_global_size, var_vals):
   test_global_size = [sym_infer(sz, var_vals) for sz in global_size]
+  if max_global_size < 1: raise ValueError("max_global_size must be positive")
   input_size = prod(test_global_size)
+  if input_size == 0: return test_global_size, 1.0
   while prod(test_global_size) > max_global_size:
-    for j in range(len(global_size)-1,-1,-1):
-      if test_global_size[j] > 16:
-        test_global_size[j] //= 2
-        break
+    j = next((j for j in range(len(global_size)-1,-1,-1) if test_global_size[j] > 16),
+             max(range(len(global_size)), key=test_global_size.__getitem__))
+    test_global_size[j] //= 2
   return test_global_size, input_size / prod(test_global_size)
 
 def _time_program(prg:UOp, var_vals:dict[str, int], rawbufs:list[Buffer], early_stop:float|None=None,

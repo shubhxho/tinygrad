@@ -158,7 +158,11 @@ class MovementMixin:
     print(t.expand(4, -1).numpy())
     ```
     """
-    new_shape = tuple(from_ if to == -1 or to is None else to for from_, to in zip(*(_align_left(self.shape, argfix(shape, *args)))))
+    shape = argfix(shape, *args)
+    if len(shape) < self.ndim: raise ValueError("cannot expand to fewer dimensions")
+    if any(s == -1 or s is None for s in shape[:len(shape)-self.ndim]):
+      raise ValueError("cannot infer a new leading dimension in expand")
+    new_shape = tuple(from_ if to == -1 or to is None else to for from_, to in zip(*_align_left(self.shape, shape)))
     return self._broadcast_to(new_shape)
 
   def reshape(self, shape, *args) -> Self:
@@ -492,7 +496,9 @@ class MovementMixin:
     ```
     """
     if indexing not in ("ij", "xy"): raise RuntimeError(f'indexing must be in ("ij", "xy"), got {indexing}')
-    if len(tensors:=(self, *args)) == 1: return tensors
+    tensors = (self, *args)
+    if any(t.ndim > 1 for t in tensors): raise RuntimeError("meshgrid inputs must be scalars or 1D tensors")
+    if len(tensors) == 1: return (self.reshape(-1),)
     basis = tuple(range(len(tensors))) if indexing == "ij" else (1, 0) + tuple(range(2, len(tensors)))
     tensors = tuple(t.reshape((-1,) + (1,)*(len(args) - i)) for i,t in zip(basis, tensors))
     output_shape = _broadcast_shape(*(t.shape for t in tensors))
@@ -527,8 +533,8 @@ class MovementMixin:
     """
     if (dim1:=self._resolve_dim(dim1)) == (dim2:=self._resolve_dim(dim2)): raise RuntimeError("dim1 and dim2 cannot be the same dimension")
     x = self.permute(*[i for i in range(self.ndim) if i != dim1 and i != dim2], dim1, dim2)
-    if offset >= 0: x = x.shrink(tuple(None for _ in x.shape[:-1]) + ((offset, x.shape[-1]),))
-    else: x = x.shrink(tuple(None for _ in x.shape[:-2]) + ((-offset, x.shape[-2]), None))
+    if offset >= 0: x = x.shrink(tuple(None for _ in x.shape[:-1]) + ((min(offset, x.shape[-1]), x.shape[-1]),))
+    else: x = x.shrink(tuple(None for _ in x.shape[:-2]) + ((min(-offset, x.shape[-2]), x.shape[-2]), None))
     if (d := min(int(x.shape[-2]), int(x.shape[-1]))) <= 0: return x.reshape(*x.shape[:-2], 0)
     nones, x = tuple(None for _ in x.shape[:-2]), x.shrink_to(tuple(None for _ in x.shape[:-2]) + (d, d))
     return x.flatten(-2).pad_to(nones+(d*(d+1),)).unflatten(-1, (d, d+1)).shrink_to(nones+(None, 1)).squeeze(-1)
@@ -587,6 +593,8 @@ class MovementMixin:
     ```
     """
     repeats = argfix(repeats, *args)
+    if len(repeats) < self.ndim: raise ValueError("repeat requires at least one count per input dimension")
+    if any(resolve(r < 0) for r in repeats): raise ValueError("repeat counts must be non-negative")
     base_shape = _align_left(self.shape, repeats)[0]
     unsqueezed_shape = flatten([[s] if r == 1 else [1, s] for r, s in zip(repeats, base_shape)])
     expanded_shape = flatten([[s] if r == 1 else [r, s] for r, s in zip(repeats, base_shape)])

@@ -490,14 +490,17 @@ def fetch(url:str, name:pathlib.Path|str|None=None, subdir:str|None=None, gunzip
       progress_bar:tqdm = tqdm(total=length, unit='B', unit_scale=True, desc=f"{url}")
       h = hashlib.sha256() if sha256 else None
       with tempfile.NamedTemporaryFile(dir=_dir, delete=False) as f:
-        while chunk := readfile.read(16384):
-          if h: h.update(chunk)
-          progress_bar.update(f.write(chunk))
-        f.close()
-        if h and (actual_sha256:=h.hexdigest()) != sha256: raise RuntimeError(f"fetch sha mismatch, expected {sha256} but got {actual_sha256}")
-        pathlib.Path(f.name).rename(fp)
-      progress_bar.update(close=True)
-      if length and (file_size:=os.stat(fp).st_size) < length: raise RuntimeError(f"fetch size incomplete, {file_size} < {length}")
+        try:
+          while chunk := readfile.read(16384):
+            if h: h.update(chunk)
+            progress_bar.update(f.write(chunk))
+          f.close()
+          if h and (actual_sha256:=h.hexdigest()) != sha256: raise RuntimeError(f"fetch sha mismatch, expected {sha256} but got {actual_sha256}")
+          if length and (file_size:=os.stat(f.name).st_size) < length: raise RuntimeError(f"fetch size incomplete, {file_size} < {length}")
+          pathlib.Path(f.name).rename(fp)
+        finally:
+          pathlib.Path(f.name).unlink(missing_ok=True)
+          progress_bar.update(close=True)
   if extract:
     if not extract_dir.is_dir():
       import tarfile

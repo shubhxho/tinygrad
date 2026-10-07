@@ -1056,6 +1056,7 @@ class OpMixin(ElementwiseMixin, ReduceMixin):
     ```
     """
     assert isinstance(size, (tuple,list)) and all_int(size) and 0 < len(size) <= self.ndim, f"invalid {size=}"
+    assert all(s > 0 for s in size) and all(s > 0 for s in self.shape[-len(size):]), "interpolate spatial sizes must be positive"
     assert mode in ("linear", "nearest", "nearest-exact"), "only supports linear, nearest or nearest-exact interpolate"
     assert not (align_corners and mode != "linear"), "align_corners option can only be set with the interpolating mode linear"
     x, expand = self, list(self.shape)
@@ -1466,6 +1467,13 @@ class OpMixin(ElementwiseMixin, ReduceMixin):
     if not (self.ndim > 0 and w.ndim > 0): raise RuntimeError(f"both tensors need to be at least 1D, got {self.ndim=}, {w.ndim=}")
     if self.shape[-1] != w.shape[-min(w.ndim, 2)]: raise RuntimeError(f"cannot image_dot {self.shape} and {w.shape}")
 
+    if w.ndim == 1: return self.image_dot(w.unsqueeze(-1), dtype=dtype).squeeze(-1)
+
+    if self.ndim == 1 and w.ndim >= 2: return self.unsqueeze(0).image_dot(w, dtype=dtype).squeeze(-2)
+    if self.ndim >= 2 and w.ndim >= 2:
+      batch_shape = _broadcast_shape(self.shape[:-2], w.shape[:-2])
+      self, w = self._broadcast_to(batch_shape + self.shape[-2:]), w._broadcast_to(batch_shape + w.shape[-2:])
+
     bs, groups, cin, cout = prod(self.shape[0:-2]), prod(w.shape[0:-2]), w.shape[-2], w.shape[-1]
     out_shape_t = self.shape[0:-2] + (cout,-1) if len(self.shape) > 1 else (cout,)
 
@@ -1856,7 +1864,7 @@ class OpMixin(ElementwiseMixin, ReduceMixin):
       else: permute = permute[0].reshape(1).cat(((permute[1:num] - 2) % (num - 1)) + 1)
       return U, V, permute
     # classical Jacobi converges in ~4 sweeps; one full sweep is (num-1) rounds for even num
-    for _ in range(4 * num): U, V, permute = one_round_jacobi(U, V, permute)
+    for _ in range(4 * num if num > 1 else 0): U, V, permute = one_round_jacobi(U, V, permute)
     #extract singular values and sort. construct U from Q
     S, indices = U.square().sum(-2).sqrt().sort(dim=-1, descending=True)
     new_indices = indices.unsqueeze(-2).expand(b_shape + (num, num))
