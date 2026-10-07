@@ -1856,7 +1856,7 @@ class OpMixin(ElementwiseMixin, ReduceMixin):
       else: permute = permute[0].reshape(1).cat(((permute[1:num] - 2) % (num - 1)) + 1)
       return U, V, permute
     # classical Jacobi converges in ~4 sweeps; one full sweep is (num-1) rounds for even num
-    for _ in range(4 * num): U, V, permute = one_round_jacobi(U, V, permute)
+    for _ in range(4 * num if num > 1 else 0): U, V, permute = one_round_jacobi(U, V, permute)
     #extract singular values and sort. construct U from Q
     S, indices = U.square().sum(-2).sqrt().sort(dim=-1, descending=True)
     new_indices = indices.unsqueeze(-2).expand(b_shape + (num, num))
