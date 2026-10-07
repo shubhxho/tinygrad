@@ -587,6 +587,8 @@ class MovementMixin:
     ```
     """
     repeats = argfix(repeats, *args)
+    if len(repeats) < self.ndim: raise ValueError("repeat requires at least one count per input dimension")
+    if any(resolve(r < 0) for r in repeats): raise ValueError("repeat counts must be non-negative")
     base_shape = _align_left(self.shape, repeats)[0]
     unsqueezed_shape = flatten([[s] if r == 1 else [1, s] for r, s in zip(repeats, base_shape)])
     expanded_shape = flatten([[s] if r == 1 else [r, s] for r, s in zip(repeats, base_shape)])
